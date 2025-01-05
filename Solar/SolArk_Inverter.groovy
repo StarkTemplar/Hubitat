@@ -12,9 +12,10 @@
  *      2024-06-11    pentalingual  0.4.0       Switched to MySolArk
  *      2024-07-04    pentalingual  0.4.2       Updated API Report Handling
  *      2024-09-07    pentalingual  0.4.3       Updated link descriptions and improved error logging
+ *      2025-01-04    StarkTemplar  0.4.4       Updated battery status, source of power logic, inverter limit logic.
  */
 
-static String version() { return '0.4.3' }
+static String version() { return '0.4.4' }
 
 metadata {
     definition(
@@ -73,8 +74,8 @@ def updated() {
 
 void getToken() {
     body1 = ['username':Username,'password':Password,'grant_type':'password','client_id':'csp-web','source':'elinter']
-    def URIa = "https://openapi.inteless.com/v1/oauth/token"
-    def URIb = "https://pv.inteless.com/api/v1/oauth/token"
+    // def URIa = "https://openapi.inteless.com/v1/oauth/token"
+    // def URIb = "https://pv.inteless.com/api/v1/oauth/token"
     def URIc = "https://www.solarkcloud.com/oauth/token"
     def paramsTOK = [
         uri: URIc,
@@ -94,7 +95,10 @@ void getToken() {
             runIn(10,queryData)
         })
     } catch (Exception) {
-     log.error "unable to login. This could be due to an invalid username/password, or MySolArk may be down."
+        if (logEnable) {
+            log.debug exception
+        }
+        log.error "unable to login. This could be due to an invalid username/password, or MySolArk may be down."
     }
 }
 
@@ -111,15 +115,35 @@ void getPlantDetails() {
         httpGet(paramsInitial,  { resp ->
             if (logEnable) log.debug(resp.getData().data)
             
-            def invLimit = resp.getData().data.infos.ratePower[0]
-            state.SystemSize =  invLimit.toInteger()
+            def systemModel = resp.getData().data.infos.ratePower[0]
+            state.SystemSize =  systemModel.toInteger()
             state.inverterSN = resp.getData().data.infos.sn[0]
+
+            /* inverter's AC Limit is different depending on models
+                * 12K - 37.5A
+                * 15K - 62.5A total, 50A batteries only
+                * 30K - 83.4A
+                * 60K - 72.3A
+            */
+            if ( state.SystemSize == 12000 ) {
+                state.inverterLimit = 37
+            } else if ( state.SystemSize == 15000 ) {
+                state.inverterLimit = 62
+            } else if ( state.SystemSize == 30000 ) {
+                state.inverterLimit = 83
+            } else if ( state.SystemSize == 60000 ) {
+                state.inverterLimit = 72
+            } else {
+                state.inverterLimit = 0
+            }
         })
 }
     
      catch (exception) {
-        log.error exception
-        log.debug("unable to return the inverter for this plant you may need to check that the plant id ${plantID} is correct")
+        if (logEnable) {
+            log.debug exception
+        }
+        log.error("unable to return the inverter for this plant you may need to check that the plant id ${plantID} is correct")
         return null
     }
 }
@@ -143,66 +167,81 @@ void queryData()  {
             
             boolean grid = resp.getData().data.gridOrMeterPower > 120
             boolean solar = resp.getData().data.pvPower > 120
-            boolean battPower = resp.getData().data.battPower> 120
+            boolean battPower = resp.getData().data.battPower > 120
+            boolean gen = resp.getData().data.genPower > 120
+            
             float curr = ((resp.getData().data.loadOrEpsPower - resp.getData().data.gridOrMeterPower)/ 120 )
             float amperesEst = curr.round(2)
-            int battCharge = resp.getData().data.battPower
-            if (resp.getData().data.toBat) battCharge = battCharge* -1 
+            
             int homePower = resp.getData().data.loadOrEpsPower
             int gridPower = resp.getData().data.gridOrMeterPower
             if (resp.getData().data.toGrid) gridPower = -gridPower
+            
+            int pvPower = resp.getData().data.pvPower
+            int genPower = resp.getData().data.genPower
+
             int battSOC = resp.getData().data.soc
+            int battCharge = resp.getData().data.battPower
+            if (resp.getData().data.toBat) battCharge = battCharge* -1 
+            
             def textSource = ""
             def newSource = ""
             
-            if(grid) {
+            if ((grid && solar) || (gen && solar) || (battPower && solar) || (gen && battPower)) {
+                newSource = "mixed"
+                textSource = "mixed"
+            } else if (grid) {
                 newSource = "mains"
                 textSource = "grid"
-            } else {
-                if(solar) {
-                    newSource = "dc"
-                    textSource = "solar"
-                } else {
-                if(battPower) {
-                   newSource =  "battery"  
-                    textSource = "battery"  
-                    } else { 
-                       newSource = "unknown"
-                    textSource = "unknown"
-                    }
-                }
+            } else if (solar) {
+                newSource = "dc"
+                textSource = "solar"
+            } else if (battPower) {
+                newSource =  "battery"  
+                textSource = "battery"  
+            } else if (gen) {
+                newSource =  "generator"  
+                textSource = "generator"  
+            }else { 
+                newSource = "unknown"
+                textSource = "unknown"
             }
             
+            // +- 50 watts is used as buffer because there is always some of minor draw
+            // to or from the grid and batteries
             String batStat = ""
-            if (amperesEst <-1 ) {
-                batStat = "Charging Battery from Grid"
-            } else {
-                if ( battCharge < 0 ) { 
-                     batStat = "Charging Battery from Solar"
+            if ( battCharge < -50 ) { 
+                if ( pvPower > 50 ) {    
+                    batStat = "Charging Battery from Solar"
+                } else if ( genPower > 50 ) {
+                    batStat = "Charging Battery from Generator"
+                } else {
+                    batStat = "Charging Battery from Grid"
                 }
-                if ( battCharge == 0 ) { 
-                    batStat = "Battery not in use"
-                }
-                if ( battCharge > 0 ) {
-                    if( gridPower <0 ) {
+            } else if ( battCharge >= -50 && battCharge <= 50 ) { 
+                batStat = "Battery not in use"
+            } else if ( battCharge > 50 ) {
+                if ( gridPower < -50 ) {
                     batStat = "Selling Battery to Grid"
-                    } else {
+                } else {
                     batStat = "Discharging Battery"  
-                    }
                 }
+            } else {
+                batStat = "Unknown" 
             }
+
             if ( homePower == 0 )   {          
             } else {
-            sendEvent(name: "power", value: homePower, unit: "W")
-            sendEvent(name: "battery", value:  battSOC, unit: "%")         
+                sendEvent(name: "power", value: homePower, unit: "W")
+                sendEvent(name: "battery", value:  battSOC, unit: "%")         
             
-            sendEvent(name: "powerSource", value: newSource)
+                sendEvent(name: "powerSource", value: newSource)
             
-            sendEvent(name: "PVPower", value: resp.getData().data.pvPower, unit: "W")
-            sendEvent(name: "GridPowerDraw", value: gridPower, unit: "W")
-            sendEvent(name: "BatteryDraw", value: battCharge, unit: "W")
-            sendEvent(name: "GeneratorDraw", value: resp.getData().data.genPower, unit: "W")
-            sendEvent(name: "BatteryStatus", value: batStat)
+                sendEvent(name: "PVPower", value: pvPower, unit: "W")
+                sendEvent(name: "GridPowerDraw", value: gridPower, unit: "W")
+                sendEvent(name: "BatteryDraw", value: battCharge, unit: "W")
+                sendEvent(name: "GeneratorDraw", value: genPower, unit: "W")
+                sendEvent(name: "BatteryStatus", value: batStat)
             }
             
             if (txtEnable) {
@@ -212,22 +251,25 @@ void queryData()  {
                     } else {
                         log.error "MySolArk API is offline. We will try again in ${refreshSched} minutes."
                     }
-                   } else { 
+                } else { 
                     int AbsBatt = Math.abs(battCharge)
                     if ( AbsBatt < 250) {
                         log.info "Power Source is ${textSource}, Load is drawing ${homePower} watts. Battery is at a ${battSOC}% charge, operating at ${AbsBatt} watts."
                     } else {
-                        log.info "${batStat} at a rate of ${AbsBatt} watts. Battery is at a ${battSOC}% charge."
+                        log.info "Power Source is ${textSource}, ${batStat} at a rate of ${AbsBatt} watts. Battery is at a ${battSOC}% charge."
                     }
                 }
-                
             }
-            
+
+            //Call functions for more detailed data and warnings
+            getAmperage(battCharge)
         })
-        getAmperage()
+
     } catch (exception) {
-        log.error exception
-        if (logEnable) log.debug("token may have expired, trying to get a new one; number of attempts is ${attemptsNo} and token is ${key} ")
+        if (logEnable) {
+            log.debug exception
+        }
+        log.error("token may have expired, trying to get a new one; number of attempts is ${attemptsNo} and token is ${key} ")
         if (attemptsNo == 0) { 
             getToken() 
         }
@@ -236,7 +278,7 @@ void queryData()  {
 }
 
 
-void getAmperage() {
+void getAmperage(float battCharge) {
      def key = "Bearer ${state.xTokenKeyx}"
      def paramsAmps = [  
         uri: "https://www.solarkcloud.com/api/v1/inverter/${state.inverterSN}/realtime/output",
@@ -247,39 +289,67 @@ void getAmperage() {
         httpGet(paramsAmps, { resp ->
             if (logEnable) log.debug(resp.getData().data)
             try {
-            float valVac1 = 0
-            def vac1 = resp.getData().data.vip[0]
-            if( vac1 ) {
-                vac1 = vac1.current
-                valVac1 = vac1.toFloat()
-                            } else {
-                 valVac1 = 0
+                float valVac1 = 0
+                def vac1 = resp.getData().data.vip[0]
+                if( vac1 ) {
+                    vac1 = vac1.current
+                    valVac1 = vac1.toFloat()
+                                } else {
+                     valVac1 = 0
+                    }
+
+                float valVac2 = 0
+                def vac2 = resp.getData().data.vip[1]
+                if( vac2 ) {
+                    vac2 = vac2.current
+                    valVac2 = vac2.toFloat()
+                                } else {
+                     valVac2 = 0
+                    }
+            
+                float valVac3 = 0
+                def vac3 = resp.getData().data.vip[2]
+                if( vac3 ) {
+                    vac3 = vac3.current
+                    valVac3 = vac3.toFloat()
+                } else {
+                     valVac3 = 0
+                    }
+
+                float amperes = (valVac1 + valVac2 + valVac3).round(2)
+
+                if ( state.inverterLimit > 0 ) {
+                    float invOutput = ((amperes/state.inverterLimit)*100).round(2)
+                    def invMsg = "Inverter pushing ${amperes} amps, ${invOutput}% of the inverter limit."
+                    def battMsg = ""
+                    def battOutput = 0
+                    //special limit for 15K model which has 50A limitation on batteries only
+                    if ( state.SystemSize == 15000 && battCharge > 0) {
+                        battCharge = (battCharge/240).round(2)
+                        battOutput = ((battCharge/50)*100).round(2)
+                        battMsg = "${battCharge} amps from the battery, ${battOutput}% of the battery only inverter limit."
+                    }
+                    if ( invOutput >= 90 || battOutput >= 90 ) {
+                        log.error("${invMsg} ${battMsg}")
+                    } else if ( invOutput >= 75 || battOutput >= 75 ) {
+                        log.warn("${invMsg} ${battMsg}") 
+                    } else {
+                        log.info("${invMsg} ${battMsg}") 
+                    }
+                } else {
+                    log.warn("Inverter pushing ${amperes} amps, inverter model and limit is unknown")
                 }
 
-            float valVac2 = 0
-            def vac2 = resp.getData().data.vip[1]
-            if( vac2 ) {
-                vac2 = vac2.current
-                valVac2 = vac2.toFloat()
-                            } else {
-                 valVac2 = 0
+                sendEvent(name: "amperage", value: amperes, unit: "A")
+
+            } catch (exception) { 
+                if (logEnable) {
+                    log.debug exception
                 }
-            
-            float valVac3 = 0
-            def vac3 = resp.getData().data.vip[2]
-            if( vac3 ) {
-                vac3 = vac3.current
-                valVac3 = vac3.toFloat()
-            } else {
-                 valVac3 = 0
+                log.error("token may have expired, trying to get a new one; number of attempts is ${attemptsNo} and token is ${key} ")
+                if (attemptsNo == 0) { 
+                    getToken() 
                 }
-            
-            float amperes = (valVac1 + valVac3 + valVac2).round(2)
-            // invLimit warning = 66.66% power at 120 volts is SystemSize/180
-            int invLimit = state.SystemSize/180
-            int invOutput = (amperes*66.66)/invLimit
-            if ( amperes>invLimit ) log.warn("Inverter pushing ${amperes} amps, ${invOutput}% of the inverter limit.")
-            sendEvent(name: "amperage", value: amperes, unit: "A")         
-            } catch(exception) { }}) 
+                return null
+            }})
 }
-
