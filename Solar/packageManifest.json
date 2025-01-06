@@ -1,10 +1,10 @@
 {
   "packageName": "SolArk Inverter",
   "author": "Andrew Nunes",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "minimumHEVersion": "0.0",
   "dateReleased": "2025-01-05",
-  "releaseNotes": "Version [0.4.4] - 2025-01-05\n  - Updated battery status, source of power logic, inverter limit logic.",
+  "releaseNotes": "Version [0.4.5] - 2025-01-05\n  - Updated attribute name from Power to Load. Added additional API calls to gather usage stats for the day/total.",
   "drivers": [
     {
       "id": "e1947fb4-eab5-4b2a-a867-413f6ca89ffe",

@@ -13,9 +13,10 @@
  *      2024-07-04    pentalingual  0.4.2       Updated API Report Handling
  *      2024-09-07    pentalingual  0.4.3       Updated link descriptions and improved error logging
  *      2025-01-04    StarkTemplar  0.4.4       Updated battery status, source of power logic, inverter limit logic.
+ *      2025-01-05    StarkTemplar  0.4.5       Updated attribute name from Power to Load. Added additional API calls to gather usage stats for the day/total.
  */
 
-static String version() { return '0.4.4' }
+static String version() { return '0.4.5' }
 
 metadata {
     definition(
@@ -35,10 +36,25 @@ metadata {
 
         attribute "lastresponsetime", "string"
         attribute "PVPower", "number"
+        attribute "PVPowerToday", "number"
+        attribute "PVPowerAlltime", "number"
         attribute "GridPowerDraw", "number"
+        attribute "GridImportToday", "number"
+        attribute "GridImportAlltime", "number"
+        attribute "GridExportToday", "number"
+        attribute "GridExportAlltime", "number"
+        attribute "Load", "number"
+        attribute "LoadToday", "number"
+        attribute "LoadAlltime", "number"
         attribute "BatteryDraw", "number"
-        attribute "GeneratorDraw", "number"
         attribute "BatteryStatus", "string"
+        attribute "BatteryChargeToday", "number"
+        attribute "BatteryChargeAlltime", "number"
+        attribute "BatteryDischargeToday", "number"
+        attribute "BatteryDischargeAlltime", "number"
+        attribute "GeneratorDraw", "number"
+        attribute "GeneratorToday", "number"
+        attribute "GeneratorAlltime", "number"
     }
 
     preferences {
@@ -59,7 +75,7 @@ def initialize() {
      log.info "Initializing the MySolArk service..."
      state.clear()
      state.Amperage = "the AC output being inverted from DC Power Sources (grid/gen current is not inverted)"
-     state.Power = "the total number of Watts being drawn by the load/home"
+     state.Load = "the total number of Watts being drawn by the load/home"
      getToken()
      runIn(5,getPlantDetails)
 }
@@ -232,7 +248,7 @@ void queryData()  {
 
             if ( homePower == 0 )   {          
             } else {
-                sendEvent(name: "power", value: homePower, unit: "W")
+                sendEvent(name: "Load", value: homePower, unit: "W")
                 sendEvent(name: "battery", value:  battSOC, unit: "%")         
             
                 sendEvent(name: "powerSource", value: newSource)
@@ -261,7 +277,7 @@ void queryData()  {
                 }
             }
 
-            //Call functions for more detailed data and warnings
+            //Call function for more detailed inverter data and warnings
             getAmperage(battCharge)
         })
 
@@ -342,6 +358,9 @@ void getAmperage(float battCharge) {
 
                 sendEvent(name: "amperage", value: amperes, unit: "A")
 
+                //Call function for more detailed pv data
+                getPVDetails()
+
             } catch (exception) { 
                 if (logEnable) {
                     log.debug exception
@@ -351,5 +370,177 @@ void getAmperage(float battCharge) {
                     getToken() 
                 }
                 return null
-            }})
+            }
+        })
+}
+
+void getPVDetails() {
+     def key = "Bearer ${state.xTokenKeyx}"
+     def paramsAmps = [  
+        uri: "https://www.solarkcloud.com/api/v1/inverter/${state.inverterSN}/realtime/input",
+        headers: [ 'Authorization' : key ],
+        requestContentType: "application/x-www-form-urlencoded"
+    ]
+    
+        httpGet(paramsAmps, { resp ->
+            if (logEnable) log.debug(resp.getData().data)
+            try {
+                def PVPowerToday = resp.getData().data.etoday
+                def PVPowerAlltime = resp.getData().data.etotal
+                
+                sendEvent(name: "PVPowerToday", value: PVPowerToday, unit: "kWh")
+                sendEvent(name: "PVPowerAlltime", value: PVPowerAlltime, unit: "kWh")
+
+                //Call function for more detailed grid data
+                getGridDetails()
+
+            } catch (exception) { 
+                if (logEnable) {
+                    log.debug "getPVDetails() - ${exception}"
+                }
+                log.error("token may have expired, trying to get a new one; number of attempts is ${attemptsNo} and token is ${key} ")
+                if (attemptsNo == 0) { 
+                    getToken() 
+                }
+                return null
+            }
+        })           
+}
+
+void getGridDetails() {
+     def key = "Bearer ${state.xTokenKeyx}"
+     def paramsAmps = [  
+        uri: "https://www.solarkcloud.com/api/v1/inverter/grid/${state.inverterSN}/realtime",
+        headers: [ 'Authorization' : key ],
+        requestContentType: "application/x-www-form-urlencoded"
+    ]
+    
+        httpGet(paramsAmps, { resp ->
+            if (logEnable) log.debug(resp.getData().data)
+            try {
+                def GridImportToday = resp.getData().data.etodayFrom
+                def GridImportAlltime = resp.getData().data.etotalFrom
+                def GridExportToday = resp.getData().data.etodayTo
+                def GridExportAlltime = resp.getData().data.etotalTo
+                
+                sendEvent(name: "GridImportToday", value: GridImportToday, unit: "kWh")
+                sendEvent(name: "GridImportAlltime", value: GridImportAlltime, unit: "kWh")
+                sendEvent(name: "GridExportToday", value: GridExportToday, unit: "kWh")
+                sendEvent(name: "GridExportAlltime", value: GridExportAlltime, unit: "kWh")
+
+                //Call function for more detailed load data
+                getLoadDetails()
+
+            } catch (exception) { 
+                if (logEnable) {
+                    log.debug "getGridDetails() - ${exception}"
+                }
+                log.error("token may have expired, trying to get a new one; number of attempts is ${attemptsNo} and token is ${key} ")
+                if (attemptsNo == 0) { 
+                    getToken() 
+                }
+                return null
+            }
+        })           
+}
+
+void getLoadDetails() {
+     def key = "Bearer ${state.xTokenKeyx}"
+     def paramsAmps = [  
+        uri: "https://www.solarkcloud.com/api/v1/inverter/load/${state.inverterSN}/realtime",
+        headers: [ 'Authorization' : key ],
+        requestContentType: "application/x-www-form-urlencoded"
+    ]
+    
+        httpGet(paramsAmps, { resp ->
+            if (logEnable) log.debug(resp.getData().data)
+            try {
+                def LoadToday = resp.getData().data.dailyUsed
+                def LoadAlltime = resp.getData().data.totalUsed
+                
+                sendEvent(name: "LoadToday", value: LoadToday, unit: "kWh")
+                sendEvent(name: "LoadAlltime", value: LoadAlltime, unit: "kWh")
+
+                //Call function for more detailed battery data
+                getBattDetails()
+
+
+            } catch (exception) { 
+                if (logEnable) {
+                    log.debug "getLoadDetails() - ${exception}"
+                }
+                log.error("token may have expired, trying to get a new one; number of attempts is ${attemptsNo} and token is ${key} ")
+                if (attemptsNo == 0) { 
+                    getToken() 
+                }
+                return null
+            }
+        })           
+}
+
+void getBattDetails() {
+     def key = "Bearer ${state.xTokenKeyx}"
+     def paramsAmps = [  
+        uri: "https://www.solarkcloud.com/api/v1/inverter/battery/${state.inverterSN}/realtime",
+        headers: [ 'Authorization' : key ],
+        requestContentType: "application/x-www-form-urlencoded"
+    ]
+    
+        httpGet(paramsAmps, { resp ->
+            if (logEnable) log.debug(resp.getData().data)
+            try {
+                def BatteryChargeToday = resp.getData().data.etodayChg
+                def BatteryChargeAlltime = resp.getData().data.etotalChg
+                def BatteryDischargeToday = resp.getData().data.etodayDischg
+                def BatteryDischargeAlltime = resp.getData().data.etotalDischg
+                
+                sendEvent(name: "BatteryChargeToday", value: BatteryChargeToday, unit: "kWh")
+                sendEvent(name: "BatteryChargeAlltime", value: BatteryChargeAlltime, unit: "kWh")
+                sendEvent(name: "BatteryDischargeToday", value: BatteryDischargeToday, unit: "kWh")
+                sendEvent(name: "BatteryDischargeAlltime", value: BatteryDischargeAlltime, unit: "kWh")
+
+                //Call function for more detailed generator data
+                getGenDetails()
+
+            } catch (exception) { 
+                if (logEnable) {
+                    log.debug "getBattDetails() - ${exception}"
+                }
+                log.error("token may have expired, trying to get a new one; number of attempts is ${attemptsNo} and token is ${key} ")
+                if (attemptsNo == 0) { 
+                    getToken() 
+                }
+                return null
+            }
+        })           
+}
+
+void getGenDetails() {
+     def key = "Bearer ${state.xTokenKeyx}"
+     def paramsAmps = [  
+        uri: "https://www.solarkcloud.com/api/v1/inverter/gen/${state.inverterSN}/realtime",
+        headers: [ 'Authorization' : key ],
+        requestContentType: "application/x-www-form-urlencoded"
+    ]
+    
+        httpGet(paramsAmps, { resp ->
+            if (logEnable) log.debug(resp.getData().data)
+            try {
+                def GeneratorToday = resp.getData().data.genDaily
+                def GeneratorAlltime = resp.getData().data.genTotal
+                
+                sendEvent(name: "GeneratorToday", value: GeneratorToday, unit: "kWh")
+                sendEvent(name: "GeneratorAlltime", value: GeneratorAlltime, unit: "kWh")
+
+            } catch (exception) { 
+                if (logEnable) {
+                    log.debug "getGenDetails() - ${exception}"
+                }
+                log.error("token may have expired, trying to get a new one; number of attempts is ${attemptsNo} and token is ${key} ")
+                if (attemptsNo == 0) { 
+                    getToken() 
+                }
+                return null
+            }
+        })           
 }
