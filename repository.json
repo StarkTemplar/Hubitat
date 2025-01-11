@@ -1,64 +1,16 @@
 {
-  "author": "pentalingual",
-  "gitHubUrl": "https://github.com/pentalingual/Hubitat/",
+  "author": "StarkTemplar",
+  "gitHubUrl": "https://github.com/StarkTemplar/",
   "packages": [
     {
-      "id": "b8331bb0-8fc8-4a17-a5ef-e3e79cf4e157",
-      "name": "Degree Days Irrigation Timer",
-      "category": "Utility",
-      "location": "https://raw.githubusercontent.com/pentalingual/Hubitat/master/Irrigation/packageManifest.json",
-      "description": "Use the weather to schedule your irrigation",
-      "tags": [
-        "Irrigation",
-        "Weather",
-        "Water"
-      ]
-    },
-    {
-      "id": "77d70c86-930d-4bdb-82d9-94147168d089",
-      "name": "Door Chime",
-      "category": "Convenience",
-      "location": "https://raw.githubusercontent.com/pentalingual/Hubitat/main/Chime/packageManifest.json",
-      "description": "Set up custom sounds to trigger when doors are opened; anytime, only during certain Modes, or based on HSM Status",
-      "tags": [
-        "Doors & Windows",
-        "Alarm Systems",
-        "Notifications"
-      ]
-    },
-    {
-      "id": "764cbc83-2b8b-4bd4-922f-0e73cd726d73",
+      "id": "f8063600-169f-4da2-8895-519e7753a119",
       "name": "SolArk Inverter",
       "category": "Integrations",
-      "location": "https://raw.githubusercontent.com/pentalingual/Hubitat/main/Solar/packageManifest.json",
-      "description": "Leverages the MySolArk API to update Hubitat with your SolArk inverter status",
+      "location": "https://raw.githubusercontent.com/StarkTemplar/Hubitat/refs/heads/main/Solar/packageManifest.json",
+      "description": "Read Solark Inverter data from cloud system.",
       "tags": [
         "Energy Monitoring",
         "Cloud"
-      ]
-    },
-    {
-      "id": "8c97796f-4bbd-40eb-a472-352c0e4282e9",
-      "name": "Windows Battery Driver",
-      "category": "Integrations",
-      "location": "https://raw.githubusercontent.com/pentalingual/Hubitat/main/Windows/packageManifest.json",
-      "description": "Read a Windows computer Task Schedule for Hubitat to determine its state of charge",
-      "tags": [
-        "Energy Monitoring",
-        "Misc. Devices",
-        "LAN"
-      ]
-    },
-    {
-      "id": "7a5a16c7-d82e-4436-bc62-9f34354b032a",
-      "name": "Reolink IP Camera",
-      "category": "Integrations",
-      "location": "https://raw.githubusercontent.com/pentalingual/Hubitat/main/Camera/packageManifest.json",
-      "description": "Turns on or off your Reolink IP Camera's motion detection push/email notifications",
-      "tags": [
-	"Monitoring",
-	"Notifications",
-        "LAN"
       ]
     }
   ]
