@@ -7,12 +7,11 @@
   "releaseNotes": "Version [0.4.6] - 2025-01-11\n  - Bug fixes. Update inverter calculation to use the absolute value for battery power.",
   "drivers": [
     {
-      "id": "e1947fb4-eab5-4b2a-a867-413f6ca89ffe",
+      "id": "6ab0b85a-c9ed-4c21-af13-e29461125cdd",
       "name": "SolArk Inverter",
       "namespace": "pentalingual",
-      "location": "https://raw.githubusercontent.com/pentalingual/Hubitat/main/Solar/SolArk_Inverter.groovy",
+      "location": "https://raw.githubusercontent.com/StarkTemplar/Hubitat/refs/heads/main/Solar/SolArk_Inverter.groovy",
       "required": true
     }
   ]
 }
-  
