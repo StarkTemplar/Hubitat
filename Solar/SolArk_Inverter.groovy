@@ -16,9 +16,10 @@
  *      2025-01-05    StarkTemplar  0.4.5       Updated attribute name from Power to Load. Added additional API calls to gather usage stats for the day/total.
  *      2025-01-11    StarkTemplar  0.4.6       Bug fixes. Update inverter calculation. Schedule to refresh token before token expires.
  *      2025-01-12    StarkTemplar  0.4.7       Update tile output to round to 0 decimal places. Add monthly data and monthly tile.
+ *      2025-01-13    StarkTemplar  0.4.8       Add presence capability to grid. Will allow for easier alerting when grid goes down.
  */
 
-static String version() { return '0.4.7' }
+static String version() { return '0.4.8' }
 
 metadata {
     definition(
@@ -34,7 +35,8 @@ metadata {
         capability "PowerMeter"
         capability "PowerSource"
         capability "CurrentMeter"
-        capability "Battery" 
+        capability "Battery"
+        capability "Presence Sensor"
 
         attribute "lastresponsetime", "string"
         attribute "PVPower", "number"
@@ -74,6 +76,7 @@ metadata {
         attribute "GeneratorAlltime", "number"
         attribute "ComprehensiveTile", "string"
         attribute "MonthlyTile", "string"
+        attribute "presence", "string"
     }
 
     preferences {
@@ -344,6 +347,13 @@ def queryData()  {
                 sendEvent(name: "GridPowerDraw", value: Math.round(gridPower), unit: "w")
             }
 
+            //set presence value to know if the grid is available
+            if ( gridPower == 0 ) {
+                sendEvent(name: "presence", value: "not present")
+            } else {
+                sendEvent(name: "presence", value: "present")
+            }
+
             if (Math.abs(battCharge) >= 1000) {
                 battCharge = (battCharge / 1000).round(1)
                 sendEvent(name: "BatteryDraw", value: battCharge, unit: "kW")
@@ -365,8 +375,6 @@ def queryData()  {
             sendEvent(name: "battery", value:  battSOC, unit: "%")         
             sendEvent(name: "powerSource", value: newSource)
             sendEvent(name: "BatteryStatus", value: batStat)
-
-            //def unitValue = device.currentState("BatteryDraw").unit
             
             if (txtEnable) {
                 if (batStat == "Battery not in use") {
@@ -715,7 +723,7 @@ void updateTiles() {
             compTile += "<tr><td colspan=2 style='text-align: center;'>RealTime</td><td colspan=1 style='text-align: center;'>Today</td></tr>"
             compTile += "<tr><td style='text-align: left;'>Loads:</td><td>" + device.currentValue("Load").toString() + device.currentState("Load").unit + "</td><td>" + Math.round(device.currentValue("LoadToday")).toString() + " kWh</td></tr>"
             compTile += "<tr><td style='text-align: left;'>Solar:</td><td>" + device.currentValue("PVPower").toString() + device.currentState("PVPower").unit + "</td><td>" + Math.round(device.currentValue("PVPowerToday")).toString() + " kWh</td></tr>"
-            compTile += "<tr><td style='text-align: left;'>Grid:</td><td class='solarSmall " + gridColor + device.currentValue("GridPowerDraw").toString() + device.currentState("GridPowerDraw").unit + "</td><td class='solarSmall' style='text-align: center;'>" + Math.round(device.currentValue("GridImportToday")).toString() + " kWh I / </td><td class='solarSmall' style='text-align: center;'>" + Math.round(device.currentValue("GridExportToday")).toString() + " kWh E</td></tr>"
+            compTile += "<tr><td style='text-align: left;'>Grid:</td><td class='solarSmall' " + gridColor + device.currentValue("GridPowerDraw").toString() + device.currentState("GridPowerDraw").unit + "</td><td class='solarSmall' style='text-align: center;'>" + Math.round(device.currentValue("GridImportToday")).toString() + " kWh I / </td><td class='solarSmall' style='text-align: center;'>" + Math.round(device.currentValue("GridExportToday")).toString() + " kWh E</td></tr>"
             compTile += "<tr><td style='text-align: left;'>Gen:</td><td>" + device.currentValue("GeneratorDraw").toString() + device.currentState("GeneratorDraw").unit + "</td><td>" + Math.round(device.currentValue("GeneratorToday")).toString() + " kWh</td></tr>"
             compTile += "<tr><td style='text-align: left;'>Batt:</td><td>" + device.currentValue("BatteryDraw").toString() + device.currentState("BatteryDraw").unit + "</td><td class='solarSmall' style='text-align: center;'>" + Math.round(device.currentValue("BatteryChargeToday")).toString() + " kWh C / </td><td class='solarSmall' style='text-align: center;'>" + Math.round(device.currentValue("BatteryDischargeToday")).toString() + " kWh D</td></tr>"
             compTile += "<tr><td style='text-align: left;'>Batt:</td><td " + battColor + device.currentValue("battery").toString() + " %</td>"

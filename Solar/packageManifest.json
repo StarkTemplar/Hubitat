@@ -1,10 +1,10 @@
 {
   "packageName": "SolArk Inverter",
   "author": "StarkTemplar",
-  "version": "0.4.7",
+  "version": "0.4.8",
   "minimumHEVersion": "0.0",
-  "dateReleased": "2025-01-12",
-  "releaseNotes": "Version [0.4.7] - 2025-01-12\n  - Update tile output to round to 0 decimal places.",
+  "dateReleased": "2025-01-13",
+  "releaseNotes": "Version [0.4.8] - 2025-01-13\n  - Add presence capability to grid. Will allow for easier alerting when grid goes down.",
   "drivers": [
     {
       "id": "6ab0b85a-c9ed-4c21-af13-e29461125cdd",
