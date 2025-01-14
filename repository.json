@@ -7,7 +7,7 @@
       "name": "SolArk Inverter",
       "category": "Integrations",
       "location": "https://raw.githubusercontent.com/StarkTemplar/Hubitat/refs/heads/main/Solar/packageManifest.json",
-      "description": "Read Solark Inverter data from cloud system.",
+      "description": "Read Solark Inverter data from mysolark.com. Gathers realtime and daily data and provides output tile for dashboard view",
       "tags": [
         "Energy Monitoring",
         "Cloud"

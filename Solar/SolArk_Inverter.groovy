@@ -15,18 +15,19 @@
  *      2025-01-04    StarkTemplar  0.4.4       Updated battery status, source of power logic, inverter limit logic.
  *      2025-01-05    StarkTemplar  0.4.5       Updated attribute name from Power to Load. Added additional API calls to gather usage stats for the day/total.
  *      2025-01-11    StarkTemplar  0.4.6       Bug fixes. Update inverter calculation. Schedule to refresh token before token expires.
+ *      2025-01-12    StarkTemplar  0.4.7       Update tile output to round to 0 decimal places. Add monthly data and monthly tile.
  */
 
-static String version() { return '0.4.6' }
+static String version() { return '0.4.7' }
 
 metadata {
     definition(
             name: "SolArk Inverter",
-            namespace: "pentalingual",
-            author: "Andrew Nunes",
+            namespace: "StarkTemplar",
+            author: "StarkTemplar",
             description: "Leverages the MySolArk API to update Hubitat with your SolArk inverter status",
             category: "Integrations",
-            importUrl: "https://raw.githubusercontent.com/pentalingual/Hubitat/main/Solar/SolArk_Inverter.groovy"
+            importUrl: "https://raw.githubusercontent.com/StarkTemplar/Hubitat/refs/heads/main/Solar/SolArk_Inverter.groovy"
     )  {
         capability "Initialize"
         capability "Refresh"
@@ -38,26 +39,41 @@ metadata {
         attribute "lastresponsetime", "string"
         attribute "PVPower", "number"
         attribute "PVPowerToday", "number"
+        attribute "PVLastMonth", "number"
+        attribute "PVThisMonth", "number"
         attribute "PVPowerAlltime", "number"
         attribute "GridPowerDraw", "number"
         attribute "GridImportToday", "number"
+        attribute "GridImportLastMonth", "number"
+        attribute "GridImportThisMonth", "number"
         attribute "GridImportAlltime", "number"
         attribute "GridExportToday", "number"
+        attribute "GridExportLastMonth", "number"
+        attribute "GridExportThisMonth", "number"
         attribute "GridExportAlltime", "number"
         attribute "Load", "number"
         attribute "LoadToday", "number"
+        attribute "LoadLastMonth", "number"
+        attribute "LoadThisMonth", "number"
         attribute "LoadAlltime", "number"
         attribute "battery", "number"
         attribute "BatteryDraw", "number"
         attribute "BatteryStatus", "string"
         attribute "BatteryChargeToday", "number"
+        attribute "BatteryChargeLastMonth", "number"
+        attribute "BatteryChargeThisMonth", "number"
         attribute "BatteryChargeAlltime", "number"
         attribute "BatteryDischargeToday", "number"
+        attribute "BatteryDischargeLastMonth", "number"
+        attribute "BatteryDischargeThisMonth", "number"
         attribute "BatteryDischargeAlltime", "number"
         attribute "GeneratorDraw", "number"
         attribute "GeneratorToday", "number"
+        attribute "GeneratorLastMonth", "number"
+        attribute "GeneratorThisMonth", "number"
         attribute "GeneratorAlltime", "number"
         attribute "ComprehensiveTile", "string"
+        attribute "MonthlyTile", "string"
     }
 
     preferences {
@@ -103,7 +119,8 @@ def refresh() {
             getLoadDetails()
             getBattDetails()
             getGenDetails()
-            updateTiles()
+            getMonthlyDetails()
+            runIn(10,updateTiles)
         } else {
             log.error "getPlantDetails error. skipping further requests. enable debugging for further detail."
         }
@@ -242,15 +259,15 @@ def queryData()  {
             float curr = ((resp.getData().data.loadOrEpsPower - resp.getData().data.gridOrMeterPower)/ 120 )
             float amperesEst = curr.round(2)
             
-            int homePower = resp.getData().data.loadOrEpsPower
-            int gridPower = resp.getData().data.gridOrMeterPower
+            float homePower = resp.getData().data.loadOrEpsPower
+            float gridPower = resp.getData().data.gridOrMeterPower
             if (resp.getData().data.toGrid) gridPower = -gridPower
             
-            int pvPower = resp.getData().data.pvPower
-            int genPower = resp.getData().data.genPower
+            float pvPower = resp.getData().data.pvPower
+            float genPower = resp.getData().data.genPower
 
             int battSOC = resp.getData().data.soc
-            int battCharge = resp.getData().data.battPower
+            float battCharge = resp.getData().data.battPower
             if (resp.getData().data.toBat) battCharge = battCharge* -1 
             
             def textSource = ""
@@ -299,39 +316,76 @@ def queryData()  {
                 batStat = "Unknown" 
             }
 
-            if ( homePower == 0 )   {          
-            } else {
-                sendEvent(name: "Load", value: homePower, unit: "W")
-                sendEvent(name: "battery", value:  battSOC, unit: "%")         
-            
-                sendEvent(name: "powerSource", value: newSource)
-            
-                sendEvent(name: "PVPower", value: pvPower, unit: "W")
-                sendEvent(name: "GridPowerDraw", value: gridPower, unit: "W")
-                sendEvent(name: "BatteryDraw", value: battCharge, unit: "W")
-                sendEvent(name: "GeneratorDraw", value: genPower, unit: "W")
-                sendEvent(name: "BatteryStatus", value: batStat)
+            //send all values to device object
+            if (homePower >= 1000) {
+                homePower = (homePower / 1000).round(1)
+                sendEvent(name: "Load", value: homePower, unit: "kW")
             }
+            else {
+                homePower = Math.round(homePower)
+                sendEvent(name: "Load", value: Math.round(homePower), unit: "w")
+            }
+            
+            if (pvPower >= 1000) {
+                pvPower = (pvPower / 1000).round(1)
+                sendEvent(name: "PVPower", value: pvPower, unit: "kW")
+            }
+            else {
+                pvPower = Math.round(pvPower)
+                sendEvent(name: "PVPower", value: Math.round(pvPower), unit: "w")
+            }
+
+            if (Math.abs(gridPower) >= 1000) {
+                gridPower = (gridPower / 1000).round(1)
+                sendEvent(name: "GridPowerDraw", value: gridPower, unit: "kW")
+            }
+            else {
+                gridPower = Math.round(gridPower)
+                sendEvent(name: "GridPowerDraw", value: Math.round(gridPower), unit: "w")
+            }
+
+            if (Math.abs(battCharge) >= 1000) {
+                battCharge = (battCharge / 1000).round(1)
+                sendEvent(name: "BatteryDraw", value: battCharge, unit: "kW")
+            }
+            else {
+                battCharge = Math.round(battCharge)
+                sendEvent(name: "BatteryDraw", value: Math.round(battCharge), unit: "w")
+            }
+
+            if (genPower >= 1000) {
+                genPower = (genPower / 1000).round(1)
+                sendEvent(name: "GeneratorDraw", value: genPower, unit: "kW")
+            }
+            else {
+                genPower = Math.round(genPower)
+                sendEvent(name: "GeneratorDraw", value: Math.round(genPower), unit: "w")
+            }
+            
+            sendEvent(name: "battery", value:  battSOC, unit: "%")         
+            sendEvent(name: "powerSource", value: newSource)
+            sendEvent(name: "BatteryStatus", value: batStat)
+
+            //def unitValue = device.currentState("BatteryDraw").unit
             
             if (txtEnable) {
                 if (batStat == "Battery not in use") {
                     if(newSource && battCharge && gridPower) {
-                        log.info "Power Source is ${textSource}, Load is drawing ${gridPower} watts. Battery is at a ${battSOC}% charge."
+                        log.info "Power Source is ${textSource}, Load is drawing ${homePower} ${device.currentState("Load").unit}. Battery is at a ${battSOC}% charge."
                     } else {
                         log.error "MySolArk API is offline. We will try again in ${refreshSched} minutes."
                     }
                 } else { 
                     int AbsBatt = Math.abs(battCharge)
                     if ( AbsBatt < 250) {
-                        log.info "Power Source is ${textSource}, Load is drawing ${homePower} watts. Battery is at a ${battSOC}% charge, operating at ${AbsBatt} watts."
+                        log.info "Power Source is ${textSource}, Load is drawing ${homePower} ${device.currentState("Load").unit}. Battery is at a ${battSOC}% charge, operating at ${AbsBatt} ${device.currentState("BatteryDraw").unit}."
                     } else {
-                        log.info "Power Source is ${textSource}, ${batStat} at a rate of ${AbsBatt} watts. Battery is at a ${battSOC}% charge."
+                        log.info "Power Source is ${textSource}, ${batStat} at a rate of ${AbsBatt} ${device.currentState("BatteryDraw").unit}. Battery is at a ${battSOC}% charge."
                     }
                 }
             }
 
-            //Call function for more detailed inverter data and warnings
-            //getAmperage(Math.abs(battCharge))
+            //Return the absolute value for battery (dis)charging. This is used for later calculations for inverter usage.
             return Math.abs(battCharge)
         })
 
@@ -343,7 +397,6 @@ def queryData()  {
         return null
     }
 }
-
 
 void getAmperage(float AbsBatt) {
      def key = "Bearer ${state.xTokenKeyx}"
@@ -392,6 +445,7 @@ void getAmperage(float AbsBatt) {
                     def battOutput = 0
                     //special limit for 15K model which has 50A limitation on batteries only
                     if ( state.SystemSize == 15000 && AbsBatt > 0) {
+                        if ( device.currentState("BatteryDraw").unit == "kW" ) AbsBatt = AbsBatt * 1000
                         AbsBatt = (AbsBatt/240).round(2)
                         battOutput = ((AbsBatt/50)*100).round(2)
                         battMsg = "${AbsBatt} amps from the battery, ${battOutput}% of the battery only inverter limit."
@@ -577,33 +631,118 @@ void getGenDetails() {
         })           
 }
 
+void getMonthlyDetails() {
+    def key = "Bearer ${state.xTokenKeyx}"
+    def month = new Date().format("MM")
+    def year = new Date().format("YYYY")
+    def months = []
+    def years = []
+    def loadArray = ["LoadThisMonth", "LoadLastMonth"]
+    def PVArray = ["PVThisMonth", "PVLastMonth"]
+    def GridExportArray = ["GridExportThisMonth", "GridExportLastMonth"]
+    def GridImportArray = ["GridImportThisMonth", "GridImportLastMonth"]
+    def BatteryChargeArray = ["BatteryChargeThisMonth", "BatteryChargeLastMonth"]
+    def BatteryDischargeArray = ["BatteryDischargeThisMonth", "BatteryDischargeLastMonth"]
+    def GeneratorArray = ["GeneratorThisMonth", "GeneratorLastMonth"]
+
+    months.add(month)
+    years.add(year)
+
+    month--
+    if ( month == "00" ) {
+        month = "12"
+        year--
+    }
+    months.add(month)
+    years.add(year)
+
+    for ( int i=0; i<=1 ; i++ ) {
+        def paramsAmps = [  
+        uri: "https://www.solarkcloud.com/api/v1/plant/energy/${plantID}/year/?lan=en&date=" + years[i] + "-" + months[i] + "&id=${plantID}",
+        headers: [ 'Authorization' : key ],
+        requestContentType: "application/x-www-form-urlencoded"
+        ]
+    
+        httpGet(paramsAmps, { resp ->
+            if (logEnable) log.debug(resp.getData().data)
+            try {
+                resp.getData().data.infos.each {
+                    if ( it.label == "Load" ) {
+                        sendEvent(name: "${loadArray[i]}", value: Math.round(it.records.value[0].toFloat()), unit: "kWh")
+                    } else if ( it.label == "PV" ) {
+                        sendEvent(name: "${PVArray[i]}", value: Math.round(it.records.value[0].toFloat()), unit: "kWh")
+                    } else if ( it.label == "Export" ) {
+                        sendEvent(name: "${GridExportArray[i]}", value: Math.round(it.records.value[0].toFloat()), unit: "kWh")
+                    } else if ( it.label == "Import" ) {
+                        sendEvent(name: "${GridImportArray[i]}", value: Math.round(it.records.value[0].toFloat()), unit: "kWh")
+                    } else if ( it.label == "Charge" ) {
+                        sendEvent(name: "${BatteryChargeArray[i]}", value: Math.round(it.records.value[0].toFloat()), unit: "kWh")
+                    } else if ( it.label == "Discharge" ) {
+                        sendEvent(name: "${BatteryDischargeArray[i]}", value: Math.round(it.records.value[0].toFloat()), unit: "kWh")
+                    } else if ( it.label == "Generator" ) {
+                        sendEvent(name: "${GeneratorArray[i]}", value: Math.round(it.records.value[0].toFloat()), unit: "kWh")
+                    }
+                }
+            } catch (exception) { 
+                if (logEnable) {
+                    log.debug "getMonthlyDetails() - ${exception}"
+                }
+                log.error("get monthly details error. enable debugging for further detail")
+                return null
+            }
+        })
+    } 
+}
+
 void updateTiles() {
 
-    if ( device.currentValue("battery") >= 80 ) {
-        battColor = "style='color: green;'>"
-    } else if ( device.currentValue("battery") < 40 ) {
-        battColor = "style='color: red;'>"
-    } else {
-        battColor = "style='color: yellow;'>"
+    try {
+        if ( device.currentValue("battery") >= 80 ) {
+            battColor = "style='color: green;'>"
+        } else if ( device.currentValue("battery") < 40 ) {
+            battColor = "style='color: red;'>"
+        } else {
+            battColor = "style='color: yellow;'>"
+        }
+
+        if ( device.currentValue("GridPowerDraw") == 0 ) {
+            gridColor = "style='color: red;'>"
+        } else {
+            gridColor = ">"
+        }
+
+        def compTile = "<table class='solarTable' cellspacing='0' cellpadding='0'>"
+            compTile += "<tr><td colspan=2 style='text-align: center;'>RealTime</td><td colspan=1 style='text-align: center;'>Today</td></tr>"
+            compTile += "<tr><td style='text-align: left;'>Loads:</td><td>" + device.currentValue("Load").toString() + device.currentState("Load").unit + "</td><td>" + Math.round(device.currentValue("LoadToday")).toString() + " kWh</td></tr>"
+            compTile += "<tr><td style='text-align: left;'>Solar:</td><td>" + device.currentValue("PVPower").toString() + device.currentState("PVPower").unit + "</td><td>" + Math.round(device.currentValue("PVPowerToday")).toString() + " kWh</td></tr>"
+            compTile += "<tr><td style='text-align: left;'>Grid:</td><td class='solarSmall " + gridColor + device.currentValue("GridPowerDraw").toString() + device.currentState("GridPowerDraw").unit + "</td><td class='solarSmall' style='text-align: center;'>" + Math.round(device.currentValue("GridImportToday")).toString() + " kWh I / </td><td class='solarSmall' style='text-align: center;'>" + Math.round(device.currentValue("GridExportToday")).toString() + " kWh E</td></tr>"
+            compTile += "<tr><td style='text-align: left;'>Gen:</td><td>" + device.currentValue("GeneratorDraw").toString() + device.currentState("GeneratorDraw").unit + "</td><td>" + Math.round(device.currentValue("GeneratorToday")).toString() + " kWh</td></tr>"
+            compTile += "<tr><td style='text-align: left;'>Batt:</td><td>" + device.currentValue("BatteryDraw").toString() + device.currentState("BatteryDraw").unit + "</td><td class='solarSmall' style='text-align: center;'>" + Math.round(device.currentValue("BatteryChargeToday")).toString() + " kWh C / </td><td class='solarSmall' style='text-align: center;'>" + Math.round(device.currentValue("BatteryDischargeToday")).toString() + " kWh D</td></tr>"
+            compTile += "<tr><td style='text-align: left;'>Batt:</td><td " + battColor + device.currentValue("battery").toString() + " %</td>"
+            compTile += "<td class='solarDate' colspan=3 style='text-align: center;'>" + new Date().format("YYYY-MM-dd HH:mm") + "</td></tr>"
+            compTile += "</table>"
+
+        if (logEnable) log.debug "${compTile}"
+        sendEvent(name: "ComprehensiveTile", value: compTile)
+
+        def monthTile = "<table class='solarTable' cellspacing='0' cellpadding='0'>"
+            monthTile += "<tr><td colspan=2 style='text-align: center;'>Last Month</td><td colspan=1 style='text-align: center;'>This Month</td></tr>"
+            monthTile += "<tr><td style='text-align: left;'>Loads:</td><td>" + device.currentValue("LoadLastMonth").toString() +  " kWh</td><td>" + device.currentValue("LoadThisMonth").toString() + " kWh</td></tr>"
+            monthTile += "<tr><td style='text-align: left;'>Solar:</td><td>" + device.currentValue("PVLastMonth").toString()  + " kWh</td><td>" + device.currentValue("PVThisMonth").toString() + " kWh</td></tr>"
+            monthTile += "<tr><td style='text-align: left;'>Grid:</td><td class='solarSmall'>" + device.currentValue("GridImportLastMonth").toString() + " I/ " + device.currentValue("GridExportLastMonth").toString() + " E </td><td class='solarSmall'>" + device.currentValue("GridImportThisMonth").toString() + " I/ " + device.currentValue("GridExportThisMonth").toString() + " E</td></tr>"
+            monthTile += "<tr><td style='text-align: left;'>Gen:</td><td>" + device.currentValue("GeneratorLastMonth").toString() + " kWh</td><td>" + device.currentValue("GeneratorLastMonth").toString() + " kWh</td></tr>"
+            monthTile += "<tr><td style='text-align: left;'>Batt:</td><td class='solarSmall'>" + device.currentValue("BatteryChargeLastMonth").toString() + " C/ " + device.currentValue("BatteryDischargeLastMonth").toString() + " D</td><td class='solarSmall'>" + device.currentValue("BatteryChargeThisMonth").toString() + " C/ " + device.currentValue("BatteryDischargeThisMonth").toString() + " D</td></tr>"
+            //monthTile += "<tr><td style='text-align: left;'>Battery:</td><td " + battColor + device.currentValue("battery").toString() + " %</td>"
+            monthTile += "<tr><td class='solarDate' colspan=3 style='text-align: center;'>" + new Date().format("YYYY-MM-dd HH:mm") + "</td></tr>"
+            monthTile += "</table>"
+            
+        if (logEnable) log.debug "${monthTile}"
+        sendEvent(name: "MonthlyTile", value: monthTile)
+    } catch (exception) { 
+        if (logEnable) {
+            log.debug "updateTiles() - ${exception}"
+        }
+        log.error("updateTiles error. enable debugging for further detail")
+        return null
     }
-
-    if ( device.currentValue("GridPowerDraw") == 0 ) {
-        gridColor = "style='color: red;'>"
-    } else {
-        gridColor = ">"
-    }
-
-    def compTile = "<table class='solarTable' cellspacing='0' cellpadding='0'>"
-        compTile += "<tr><td colspan=2 style='text-align: center;'>RealTime</td><td colspan=1 style='text-align: center;'>Today</td></tr>"
-        compTile += "<tr><td style='text-align: left;'>Loads:</td><td>" + device.currentValue("Load").toString() + "w</td><td>" + device.currentValue("LoadToday").toString() + " kWh</td></tr>"
-        compTile += "<tr><td style='text-align: left;'>Solar:</td><td>" + device.currentValue("PVPower").toString() + "w</td><td>" + device.currentValue("PVPowerToday").toString() + " kWh</td></tr>"
-        compTile += "<tr><td style='text-align: left;'>Grid:</td><td " + gridColor + device.currentValue("GridPowerDraw").toString() + "w</td><td class='solarSmall'>" + device.currentValue("GridImportToday").toString() + " kWh I / </td><td class='solarSmall'>" + device.currentValue("GridExportToday").toString() + " kWh E</td></tr>"
-        compTile += "<tr><td style='text-align: left;'>Gen:</td><td>" + device.currentValue("GeneratorDraw").toString() + "w</td><td>" + device.currentValue("GeneratorToday").toString() + " kWh</td></tr>"
-        compTile += "<tr><td style='text-align: left;'>Battery:</td><td>" + device.currentValue("BatteryDraw").toString() + "w</td><td class='solarSmall'>" + device.currentValue("BatteryChargeToday").toString() + " kWh C / </td><td class='solarSmall'>" + device.currentValue("BatteryDischargeToday").toString() + " kWh D</td></tr>"
-        compTile += "<tr><td style='text-align: left;'>Battery:</td><td " + battColor + device.currentValue("battery").toString() + " %</td>"
-        compTile += "<td class='solarDate' colspan=3 style='text-align: center;'>" + new Date().format("YYYY-MM-dd HH:mm:ss") + "</td></tr>"
-        compTile += "</table>"
-
-    if (debug) log.debug "${compTile}"
-    sendEvent(name: "ComprehensiveTile", value: compTile)
 }
