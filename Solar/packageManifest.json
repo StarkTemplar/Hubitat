@@ -1,10 +1,10 @@
 {
   "packageName": "SolArk Inverter",
   "author": "StarkTemplar",
-  "version": "0.4.8",
+  "version": "0.4.9",
   "minimumHEVersion": "0.0",
-  "dateReleased": "2025-01-13",
-  "releaseNotes": "Version [0.4.8] - 2025-01-13\n  - Add presence capability to grid. Will allow for easier alerting when grid goes down.",
+  "dateReleased": "2025-01-21",
+  "releaseNotes": "Version [0.4.9] - 2025-01-21\n  - Bug fixes. Testing single threaded option. Converted all outputted values to kW or kWh. Updated battery inverter check.",
   "drivers": [
     {
       "id": "6ab0b85a-c9ed-4c21-af13-e29461125cdd",
