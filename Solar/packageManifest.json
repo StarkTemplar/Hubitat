@@ -1,10 +1,10 @@
 {
   "packageName": "SolArk Inverter",
   "author": "StarkTemplar",
-  "version": "0.4.9",
+  "version": "0.5.0",
   "minimumHEVersion": "0.0",
-  "dateReleased": "2025-01-21",
-  "releaseNotes": "Version [0.4.9] - 2025-01-21\n  - Bug fixes. Testing single threaded option. Converted all outputted values to kW or kWh. Updated battery inverter check.",
+  "dateReleased": "2025-01-27",
+  "releaseNotes": "Version [0.5.0] - 2025-01-27\n  - Updated inverter limit check. Previous calculation was adding the currents at 110v. The Solark limitation is at 240v for the 12k and 15k models.",
   "drivers": [
     {
       "id": "6ab0b85a-c9ed-4c21-af13-e29461125cdd",

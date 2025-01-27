@@ -18,9 +18,10 @@
  *      2025-01-12    StarkTemplar  0.4.7       Update tile output to round to 0 decimal places. Add monthly data and monthly tile.
  *      2025-01-13    StarkTemplar  0.4.8       Add presence capability to grid. Will allow for easier alerting when grid goes down.
  *      2025-01-21    StarkTemplar  0.4.9       Bug fixes. Testing single threaded option. Converted all outputted values to kW or kWh. Updated battery inverter check.
+ *      2025-01-27    StarkTemplar  0.5.0       Updated inverter limit check. Previous calculation was adding the currents at 110v. The Solark limitation is at 240v for the 12k and 15k models.
  */
 
-static String version() { return '0.4.9' }
+static String version() { return '0.5.0' }
 
 metadata {
     definition(
@@ -222,14 +223,19 @@ def getPlantDetails() {
             */
             if ( state.SystemSize == 12000 ) {
                 state.inverterLimit = 37
+                state.systemVoltage = 240
             } else if ( state.SystemSize == 15000 ) {
                 state.inverterLimit = 62
+                state.systemVoltage = 240
             } else if ( state.SystemSize == 30000 ) {
                 state.inverterLimit = 83
+                state.systemVoltage = 208
             } else if ( state.SystemSize == 60000 ) {
                 state.inverterLimit = 72
+                state.systemVoltage = 480
             } else {
                 state.inverterLimit = 0
+                state.systemVoltage = 240
             }
 
             return true
@@ -396,37 +402,18 @@ void getAmperage(float battCharge, float pvPower, float gridPower, float genPowe
         httpGet(paramsAmps, { resp ->
             if (logEnable) log.debug(resp.getData().data)
             try {
-                float valVac1 = 0
-                def vac1 = resp.getData().data.vip[0]
-                if( vac1 ) {
-                    vac1 = vac1.current
-                    valVac1 = vac1.toFloat()
-                                } else {
-                     valVac1 = 0
-                    }
-
-                float valVac2 = 0
-                def vac2 = resp.getData().data.vip[1]
-                if( vac2 ) {
-                    vac2 = vac2.current
-                    valVac2 = vac2.toFloat()
-                                } else {
-                     valVac2 = 0
-                    }
-            
-                float valVac3 = 0
-                def vac3 = resp.getData().data.vip[2]
-                if( vac3 ) {
-                    vac3 = vac3.current
-                    valVac3 = vac3.toFloat()
+                def systemVoltage = (state.systemVoltage).toInteger()
+                int inverterACOutput = (resp.getData().data.pac).toInteger()
+                if ( systemVoltage >= 240 ) {
+                    systemVoltage = systemVoltage
                 } else {
-                     valVac3 = 0
-                    }
-
-                float amperes = (valVac1 + valVac2 + valVac3).round(2)
+                    systemVoltage = 240
+                }
+                
+                def amperes = Math.round(inverterACOutput/systemVoltage)
 
                 if ( state.inverterLimit > 0 ) {
-                    float invOutput = ((amperes/state.inverterLimit)*100).round(2)
+                    def invOutput = Math.round((amperes/state.inverterLimit)*100)
                     def invMsg = "Inverter ${amperes} amps, ${invOutput}% of the limit."
                     def battMsg = ""
                     def battOutput = 0
