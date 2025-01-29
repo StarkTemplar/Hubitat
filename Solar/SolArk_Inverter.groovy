@@ -19,9 +19,10 @@
  *      2025-01-13    StarkTemplar  0.4.8       Add presence capability to grid. Will allow for easier alerting when grid goes down.
  *      2025-01-21    StarkTemplar  0.4.9       Bug fixes. Testing single threaded option. Converted all outputted values to kW or kWh. Updated battery inverter check.
  *      2025-01-27    StarkTemplar  0.5.0       Updated inverter limit check. Previous calculation was adding the currents at 110v. The Solark limitation is at 240v for the 12k and 15k models.
+ *      2025-01-29    StarkTemplar  0.5.1       Updated Grid down detection.
  */
 
-static String version() { return '0.5.0' }
+static String version() { return '0.5.1' }
 
 metadata {
     definition(
@@ -348,15 +349,16 @@ def getFlow()  {
             pvPower = (pvPower / 1000).round(1)
             sendEvent(name: "PVPower", value: pvPower, unit: "kW")
 
-            gridPower = (gridPower / 1000).round(1)
-            sendEvent(name: "GridPowerDraw", value: gridPower, unit: "kW")
-
             //set presence value to know if the grid is available
+            //set before gridpower is converted to kWH for better detection of grid down events
             if ( gridPower == 0 || gridPower == 0.0 ) {
                 sendEvent(name: "presence", value: "not present")
             } else {
                 sendEvent(name: "presence", value: "present")
             }
+
+            gridPower = (gridPower / 1000).round(1)
+            sendEvent(name: "GridPowerDraw", value: gridPower, unit: "kW")
 
             battCharge = (battCharge / 1000).round(1)
             sendEvent(name: "BatteryDraw", value: battCharge, unit: "kW")
