@@ -7,8 +7,19 @@
       "name": "SolArk Inverter",
       "category": "Integrations",
       "location": "https://raw.githubusercontent.com/StarkTemplar/Hubitat/refs/heads/main/Solar/packageManifest.json",
-      "description": "Read Solark Inverter data from mysolark.com. Gathers realtime and daily data and provides output tile for dashboard view",
+      "description": "Read Solark Inverter data from cloud system.",
       "tags": [
+        "Energy Monitoring",
+        "Cloud"
+      ]
+    },
+    {
+      "id": "dc20dd0a-90b8-4d0f-939c-af673160f2eb",
+      "name": "Solcast_dual",
+      "category": "Integrations",
+      "location": "https://raw.githubusercontent.com/StarkTemplar/Solcast_dual/refs/heads/main/packageManifest.json",
+      "description": "Read Solar Forecast from Solcast.",
+	  "tags": [
         "Energy Monitoring",
         "Cloud"
       ]
