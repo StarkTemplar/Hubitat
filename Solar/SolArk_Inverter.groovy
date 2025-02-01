@@ -20,9 +20,10 @@
  *      2025-01-21    StarkTemplar  0.4.9       Bug fixes. Testing single threaded option. Converted all outputted values to kW or kWh. Updated battery inverter check.
  *      2025-01-27    StarkTemplar  0.5.0       Updated inverter limit check. Previous calculation was adding the currents at 110v. The Solark limitation is at 240v for the 12k and 15k models.
  *      2025-01-29    StarkTemplar  0.5.1       Updated Grid down detection.
+ *      2025-02-01    StarkTemplar  0.5.2       Highlight grid number when grid presence is not present.
  */
 
-static String version() { return '0.5.1' }
+static String version() { return '0.5.2' }
 
 metadata {
     definition(
@@ -689,7 +690,7 @@ void updateTiles() {
         }
 
         //when grid is down, highlight it in red
-        if ( device.currentValue("GridPowerDraw") == 0 || device.currentValue("GridPowerDraw") == 0.0) {
+        if ( device.currentValue("presence") == "not present" ) {
             gridColor = "style='color:red;'>"
         } else {
             gridColor = ">"
