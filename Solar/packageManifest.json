@@ -1,12 +1,12 @@
 {
   "packageName": "SolArk Inverter",
   "author": "StarkTemplar",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "minimumHEVersion": "0.0",
-  "dateReleased": "2025-02-01",
+  "dateReleased": "2025-03-17",
   "documentationLink": "https://github.com/StarkTemplar/Hubitat/tree/main/Solar",
   "communityLink": "https://community.hubitat.com/t/solark-sunsynk-inverter-api-link/125050",
-  "releaseNotes": "Version [0.5.2] - 2025-02-01\n  - Highlight grid number when grid presence is not present.",
+  "releaseNotes": "Version [0.5.3] - 2025-03-17\n  - Update for solark API changes.",
   "drivers": [
     {
       "id": "6ab0b85a-c9ed-4c21-af13-e29461125cdd",

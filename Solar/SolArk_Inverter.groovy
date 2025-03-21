@@ -21,9 +21,10 @@
  *      2025-01-27    StarkTemplar  0.5.0       Updated inverter limit check. Previous calculation was adding the currents at 110v. The Solark limitation is at 240v for the 12k and 15k models.
  *      2025-01-29    StarkTemplar  0.5.1       Updated Grid down detection.
  *      2025-02-01    StarkTemplar  0.5.2       Highlight grid number when grid presence is not present.
+ *      2025-03-17    StarkTemplar  0.5.3       Update for solark API changes
  */
 
-static String version() { return '0.5.2' }
+static String version() { return '0.5.3' }
 
 metadata {
     definition(
@@ -148,18 +149,18 @@ def refresh() {
 
 def getToken(refreshToken = false) {
     if ( refreshToken == true ) {
-        body1 = ['username':Username,'password':Password,'grant_type':'password','client_id':'csp-web','source':'elinter']    
+        body1 = ['username':Username,'password':Password,'grant_type':'password','client_id':'csp-web']    
     } else {
-        body1 = ['username':Username,'password':Password,'grant_type':'refresh_token','refresh_token':state.xTokenRefreshKeyx,'client_id':'csp-web','source':'elinter']
+        body1 = ['username':Username,'password':Password,'grant_type':'refresh_token','refresh_token':state.xTokenRefreshKeyx,'client_id':'csp-web']
     }
     // def URIa = "https://openapi.inteless.com/v1/oauth/token"
     // def URIb = "https://pv.inteless.com/api/v1/oauth/token"
-    def URIc = "https://www.solarkcloud.com/oauth/token"
+    def URIc = "https://api.solarkcloud.com/oauth/token"
     def paramsTOK = [
         uri: URIc,
         headers: [
-            'Origin': 'https://www.solarkcloud.com/',
-            'Referer': 'https://www.solarkcloud.com/login'
+            'Origin': 'https://www.mysolark.com',
+            'Referer': 'https://www.mysolark.com'
         ],
         body: body1
     ]
@@ -203,9 +204,10 @@ def getToken(refreshToken = false) {
 
 def getPlantDetails() {
     def key = "Bearer ${state.xTokenKeyx}"
-    body5 = ['status': 1, 'type': -1, 'limit': 1, 'page': 1]
+    body5 = ['page': 1, 'limit': 1, 'status': 1, 'stationId':plantID, 'type': -2]
+    //if (logEnable) log.debug("body5-{body5}")
     def paramsInitial = [  
-        uri: "https://www.solarkcloud.com/api/v1/plant/${plantID}/inverters",
+        uri: "https://api.solarkcloud.com/api/v1/plant/${plantID}/inverters",
         headers: [ 'Authorization' : key], 
         query: body5
         ]
@@ -216,6 +218,7 @@ def getPlantDetails() {
             def systemModel = resp.getData().data.infos.ratePower[0]
             state.SystemSize =  systemModel.toInteger()
             state.inverterSN = resp.getData().data.infos.sn[0]
+            if (logEnable) log.debug("systemSize-{state.SystemSize}")
 
             /* inverter's AC Limit is different depending on models
                 * 12K - 37.5A
@@ -270,7 +273,7 @@ def getPlantDetails() {
 def getFlow()  {
     def key = "Bearer ${state.xTokenKeyx}"
     def paramsEnergy = [  
-        uri: "https://www.solarkcloud.com/api/v1/plant/energy/${plantID}/flow",
+        uri: "https://api.solarkcloud.com/api/v1/plant/energy/${plantID}/flow",
         headers: [ 'Authorization' : key ],
         requestContentType: "application/x-www-form-urlencoded"
     ]
@@ -397,7 +400,7 @@ def getFlow()  {
 void getAmperage(float battCharge, float pvPower, float gridPower, float genPower) {
      def key = "Bearer ${state.xTokenKeyx}"
      def paramsAmps = [  
-        uri: "https://www.solarkcloud.com/api/v1/inverter/${state.inverterSN}/realtime/output",
+        uri: "https://api.solarkcloud.com/api/v1/inverter/${state.inverterSN}/realtime/output",
         headers: [ 'Authorization' : key ],
         requestContentType: "application/x-www-form-urlencoded"
         ]
@@ -462,7 +465,7 @@ void getAmperage(float battCharge, float pvPower, float gridPower, float genPowe
 void getPVDetails() {
      def key = "Bearer ${state.xTokenKeyx}"
      def paramsAmps = [  
-        uri: "https://www.solarkcloud.com/api/v1/inverter/${state.inverterSN}/realtime/input",
+        uri: "https://api.solarkcloud.com/api/v1/inverter/${state.inverterSN}/realtime/input",
         headers: [ 'Authorization' : key ],
         requestContentType: "application/x-www-form-urlencoded"
         ]
@@ -492,7 +495,7 @@ void getPVDetails() {
 void getGridDetails() {
      def key = "Bearer ${state.xTokenKeyx}"
      def paramsAmps = [  
-        uri: "https://www.solarkcloud.com/api/v1/inverter/grid/${state.inverterSN}/realtime",
+        uri: "https://api.solarkcloud.com/api/v1/inverter/grid/${state.inverterSN}/realtime",
         headers: [ 'Authorization' : key ],
         requestContentType: "application/x-www-form-urlencoded"
         ]
@@ -526,7 +529,7 @@ void getGridDetails() {
 void getLoadDetails() {
      def key = "Bearer ${state.xTokenKeyx}"
      def paramsAmps = [  
-        uri: "https://www.solarkcloud.com/api/v1/inverter/load/${state.inverterSN}/realtime",
+        uri: "https://api.solarkcloud.com/api/v1/inverter/load/${state.inverterSN}/realtime",
         headers: [ 'Authorization' : key ],
         requestContentType: "application/x-www-form-urlencoded"
         ]
@@ -556,7 +559,7 @@ void getLoadDetails() {
 void getBattDetails() {
      def key = "Bearer ${state.xTokenKeyx}"
      def paramsAmps = [  
-        uri: "https://www.solarkcloud.com/api/v1/inverter/battery/${state.inverterSN}/realtime",
+        uri: "https://api.solarkcloud.com/api/v1/inverter/battery/${state.inverterSN}/realtime",
         headers: [ 'Authorization' : key ],
         requestContentType: "application/x-www-form-urlencoded"
         ]
@@ -590,7 +593,7 @@ void getBattDetails() {
 void getGenDetails() {
      def key = "Bearer ${state.xTokenKeyx}"
      def paramsAmps = [  
-        uri: "https://www.solarkcloud.com/api/v1/inverter/gen/${state.inverterSN}/realtime",
+        uri: "https://api.solarkcloud.com/api/v1/inverter/gen/${state.inverterSN}/realtime",
         headers: [ 'Authorization' : key ],
         requestContentType: "application/x-www-form-urlencoded"
         ]
@@ -641,7 +644,7 @@ void getMonthlyDetails() {
 
     for ( int i=0; i<=1 ; i++ ) {
         def paramsAmps = [  
-        uri: "https://www.solarkcloud.com/api/v1/plant/energy/${plantID}/year/?lan=en&date=" + years[i] + "-" + months[i] + "&id=${plantID}",
+        uri: "https://api.solarkcloud.com/api/v1/plant/energy/${plantID}/year/?lan=en&date=" + years[i] + "-" + months[i] + "&id=${plantID}",
         headers: [ 'Authorization' : key ],
         requestContentType: "application/x-www-form-urlencoded"
         ]
