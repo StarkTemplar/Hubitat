@@ -22,9 +22,10 @@
  *      2025-01-29    StarkTemplar  0.5.1       Updated Grid down detection.
  *      2025-02-01    StarkTemplar  0.5.2       Highlight grid number when grid presence is not present.
  *      2025-03-17    StarkTemplar  0.5.3       Update for solark API changes
+ *      2026-02-14    StarkTemplar  0.5.4       Update to improve token expiration 
  */
 
-static String version() { return '0.5.3' }
+static String version() { return '0.5.4' }
 
 metadata {
     definition(
@@ -105,10 +106,10 @@ def initialize() {
      unschedule() //clear all previous scheduled jobs
      state.Amperage = "the AC output being inverted from DC Power Sources (grid/gen current is not inverted)"
      state.Load = "the total number of Watts being drawn by the load/home"
-     def getTokenResult = getToken(true)
+     def getTokenResult = getToken(true) //true parameter means to not use the refresh token
      if ( getTokenResult > 0 ) {
-        runIn(getTokenResult,getToken)
-        if (logEnable) log.debug("schedule to get new token in ${getTokenResult} seconds")
+        runIn(getTokenResult,refreshTokenJob) //run refreshTokenJob based on token expiration
+        log.info("schedule to get new token in ${getTokenResult} seconds")
         runIn(10,refresh)
         schedule("0 0/${refreshSched} * * * ?", refresh)
         log.info "Refreshing every ${refreshSched} minutes. Debug logging is: ${logEnable}."
@@ -147,11 +148,22 @@ def refresh() {
     }
 }
 
+def refreshTokenJob () {
+    def getTokenResult = getToken(false) //false parameter means to use the refresh token
+    if ( getTokenResult > 0 ) {
+        runIn(getTokenResult,refreshTokenJob) //run refreshTokenJob based on token expiration
+        log.info("schedule to get new token in ${getTokenResult} seconds")
+    } else {
+        log.info "getToken error. Enable debugging for further info."
+    }
+}
+
 def getToken(refreshToken = false) {
     if ( refreshToken == true ) {
         body1 = ['username':Username,'password':Password,'grant_type':'password','client_id':'csp-web']    
     } else {
         body1 = ['username':Username,'password':Password,'grant_type':'refresh_token','refresh_token':state.xTokenRefreshKeyx,'client_id':'csp-web']
+        if (logEnable) log.debug("getToken: trying to refresh token")
     }
     // def URIa = "https://openapi.inteless.com/v1/oauth/token"
     // def URIb = "https://pv.inteless.com/api/v1/oauth/token"
@@ -176,7 +188,7 @@ def getToken(refreshToken = false) {
             def tokenExpiration = resp.getData().data.expires_in as Integer
             if (logEnable) log.debug("token expiration: ${tokenExpiration}")
 
-            tokenRefreshJob = tokenExpiration - ((refreshSched.toInteger() * 60) / 2) as Integer
+            tokenRefreshJob = tokenExpiration - 120 as Integer //subtract 2 minutes from token expiration
         })
     }
     catch (groovyx.net.http.HttpResponseException exception) {
@@ -185,9 +197,9 @@ def getToken(refreshToken = false) {
         }
         def httpError = exception.getStatusCode()
         if ( httpError == 401 ) {
-            log.error("http 401 - token has expired.")
+            log.error("getToken: http 401 - token has expired.")
         } else {
-            log.error("unable to login. http error ${httpError}. enable debugging for further detail.")
+            log.error("getToken: unable to login. http error ${httpError}. enable debugging for further detail.")
         }
         return false
      }
@@ -195,7 +207,7 @@ def getToken(refreshToken = false) {
         if (logEnable) {
             log.debug exception
         }
-        log.error "unable to login. This could be due to an invalid username/password, or MySolArk site may be down. enable debugging for further detail."
+        log.error "getToken: unable to login. This could be due to an invalid username/password, or MySolArk site may be down. enable debugging for further detail."
         return false
     }
 
@@ -252,9 +264,9 @@ def getPlantDetails() {
         }
         def httpError = exception.getStatusCode()
         if ( httpError == 401 ) {
-            log.error("http 401 - token has expired. trying to refresh token")
+            log.error("http 401 - token has expired. calling refreshTokenJob")
             if ( state.xTokenRefreshKeyx ) {
-                getToken()
+                refreshTokenJob()
             }
         } else {
             log.error("http error ${httpError}. unable to return the inverter for this plant you may need to check that the plant id ${plantID} is correct. enable debugging for further detail.")
