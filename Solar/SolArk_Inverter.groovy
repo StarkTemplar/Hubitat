@@ -22,7 +22,7 @@
  *      2025-01-29    StarkTemplar  0.5.1       Updated Grid down detection.
  *      2025-02-01    StarkTemplar  0.5.2       Highlight grid number when grid presence is not present.
  *      2025-03-17    StarkTemplar  0.5.3       Update for solark API changes
- *      2026-02-14    StarkTemplar  0.5.4       Update to improve token expiration 
+ *      2026-02-16    StarkTemplar  0.5.4       Update to improve token expiration. Cleaned up logging types.
  */
 
 static String version() { return '0.5.4' }
@@ -109,17 +109,17 @@ def initialize() {
      def getTokenResult = getToken(true) //true parameter means to not use the refresh token
      if ( getTokenResult > 0 ) {
         runIn(getTokenResult,refreshTokenJob) //run refreshTokenJob based on token expiration
-        log.info("schedule to get new token in ${getTokenResult} seconds")
+        if (logEnable) log.debug("schedule to get new token in ${getTokenResult} seconds")
         runIn(10,refresh)
         schedule("0 0/${refreshSched} * * * ?", refresh)
         log.info "Refreshing every ${refreshSched} minutes. Debug logging is: ${logEnable}."
      } else {
-        log.info "getToken error. Skipping further requests. Enable debugging for further info."
+        log.error "getToken error. Skipping further requests. Enable debugging for further info."
      }
 }
                                 
 def updated() {
-    log.info "Preferences saved."
+    log.info "Preferences saved. Reinitializing..."
     initialize()
 }
 
@@ -152,9 +152,9 @@ def refreshTokenJob () {
     def getTokenResult = getToken(false) //false parameter means to use the refresh token
     if ( getTokenResult > 0 ) {
         runIn(getTokenResult,refreshTokenJob) //run refreshTokenJob based on token expiration
-        log.info("schedule to get new token in ${getTokenResult} seconds")
+        if (logEnable) log.debug("schedule to get new token in ${getTokenResult} seconds")
     } else {
-        log.info "getToken error. Enable debugging for further info."
+        log.error "refreshTokenJob error. Enable debugging for further info."
     }
 }
 

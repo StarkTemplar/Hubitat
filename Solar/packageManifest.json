@@ -3,10 +3,10 @@
   "author": "StarkTemplar",
   "version": "0.5.4",
   "minimumHEVersion": "0.0",
-  "dateReleased": "2026-02-14",
+  "dateReleased": "2026-02-16",
   "documentationLink": "https://github.com/StarkTemplar/Hubitat/tree/main/Solar",
   "communityLink": "https://community.hubitat.com/t/solark-sunsynk-inverter-api-link/125050",
-  "releaseNotes": "Version [0.5.4] - 2026-02-14\n  - Update to improve token expiration.",
+  "releaseNotes": "Version [0.5.4] - 2026-02-16\n  - Update to improve token expiration.",
   "drivers": [
     {
       "id": "6ab0b85a-c9ed-4c21-af13-e29461125cdd",
