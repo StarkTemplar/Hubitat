@@ -23,9 +23,10 @@
  *      2025-02-01    StarkTemplar  0.5.2       Highlight grid number when grid presence is not present.
  *      2025-03-17    StarkTemplar  0.5.3       Update for solark API changes
  *      2026-02-16    StarkTemplar  0.5.4       Update to improve token expiration. Cleaned up logging types.
+ *      2026-04-24    StarkTemplar  0.5.5       Update to improve token expiration.
  */
 
-static String version() { return '0.5.4' }
+static String version() { return '0.5.5' }
 
 metadata {
     definition(
@@ -106,6 +107,7 @@ def initialize() {
      unschedule() //clear all previous scheduled jobs
      state.Amperage = "the AC output being inverted from DC Power Sources (grid/gen current is not inverted)"
      state.Load = "the total number of Watts being drawn by the load/home"
+     state.refreshTokenCounter = 12 //only use the refreshToken this amount of times
      def getTokenResult = getToken(true) //true parameter means to not use the refresh token
      if ( getTokenResult > 0 ) {
         runIn(getTokenResult,refreshTokenJob) //run refreshTokenJob based on token expiration
@@ -155,14 +157,16 @@ def refreshTokenJob () {
         if (logEnable) log.debug("schedule to get new token in ${getTokenResult} seconds")
     } else {
         log.error "refreshTokenJob error. Enable debugging for further info."
+        state.refreshTokenCounter = 0
     }
 }
 
 def getToken(refreshToken = false) {
-    if ( refreshToken == true ) {
+    if ( refreshToken == true || state.refreshTokenCounter < 1) {
         body1 = ['username':Username,'password':Password,'grant_type':'password','client_id':'csp-web']    
     } else {
         body1 = ['username':Username,'password':Password,'grant_type':'refresh_token','refresh_token':state.xTokenRefreshKeyx,'client_id':'csp-web']
+        state.refreshTokenCounter -= 1 //decrement this counter each time the refresh token is used
         if (logEnable) log.debug("getToken: trying to refresh token")
     }
     // def URIa = "https://openapi.inteless.com/v1/oauth/token"
@@ -183,6 +187,11 @@ def getToken(refreshToken = false) {
         httpPostJson(paramsTOK, { resp -> 
             if (logEnable) log.debug(resp.getData().data)
             
+            if (state.xTokenRefreshKeyx != resp.getData().data.refresh_token) {
+                //this means there is a new refresh token. reset the refreshToken counter
+                state.refreshTokenCounter = 12
+            }
+            if (logEnable) log.debug("refreshTokenCounter: ${state.refreshTokenCounter}")
             state.xTokenKeyx = resp.getData().data.access_token
             state.xTokenRefreshKeyx = resp.getData().data.refresh_token
             def tokenExpiration = resp.getData().data.expires_in as Integer
@@ -201,14 +210,14 @@ def getToken(refreshToken = false) {
         } else {
             log.error("getToken: unable to login. http error ${httpError}. enable debugging for further detail.")
         }
-        return false
+        return 0
      }
     catch (Exception) {
         if (logEnable) {
             log.debug exception
         }
         log.error "getToken: unable to login. This could be due to an invalid username/password, or MySolArk site may be down. enable debugging for further detail."
-        return false
+        return 0
     }
 
     return tokenRefreshJob
